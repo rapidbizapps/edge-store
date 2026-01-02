@@ -15,9 +15,12 @@ internal class EdgeStoreImpl(
     private val config: EdgeStoreConfig
 ) : EdgeStore {
 
+    // Cache reflection results for performance
+    private val idPropertyCache = mutableMapOf<Class<*>, String>()
+    private val propertyCache = mutableMapOf<Pair<Class<*>, String>, String>()
+
     override fun create(entity: EdgeEntity, payload: ByteArray, ctx: EdgeContext): String {
-        val entityClass = Class.forName(entity.name)
-        val deserializedEntity = config.serializer.deserialize(payload, entityClass)
+        val deserializedEntity = config.serializer.deserialize(payload, entity.clazz)
         val _id = validateAndExtractId(deserializedEntity)
         EdgeLogger.logCreate(entity, _id, ctx)
         edgeBox.put(deserializedEntity)
@@ -26,8 +29,7 @@ internal class EdgeStoreImpl(
     }
 
     override fun update(entity: EdgeEntity, _id: String, payload: ByteArray, ctx: EdgeContext) {
-        val entityClass = Class.forName(entity.name)
-        val deserializedEntity = config.serializer.deserialize(payload, entityClass)
+        val deserializedEntity = config.serializer.deserialize(payload, entity.clazz)
         validateId(deserializedEntity, _id)
         EdgeLogger.logUpdate(entity, _id, ctx)
         edgeBox.put(deserializedEntity)
@@ -35,17 +37,14 @@ internal class EdgeStoreImpl(
     }
 
     override fun delete(entity: EdgeEntity, _id: String, ctx: EdgeContext) {
-        val entityClass = Class.forName(entity.name)
         EdgeLogger.logDelete(entity, _id, ctx)
-        edgeBox.remove(entityClass, _id)
+        edgeBox.remove(entity.clazz, listOf(_id))
         recordDirty(entity.name, _id, "DELETE", ctx)
     }
 
     override fun <T : Any> query(entity: EdgeEntity, filters: List<EdgeFilter>): List<T> {
-        val entityClass = Class.forName(entity.name) as Class<T>
         EdgeLogger.logQuery(entity, filters)
-        val mapFilters = filters.associate { it.field to it.value }
-        return edgeBox.query(entityClass, mapFilters)
+        return edgeBox.query(entity.clazz, filters)
     }
 
     private fun validateAndExtractId(entity: Any): String {
@@ -64,16 +63,27 @@ internal class EdgeStoreImpl(
     }
 
     private fun extractId(entity: Any): String {
-        val kClass = entity::class
-        val idProperty = kClass.memberProperties.find { it.name == "_id" }
-            ?: throw IllegalArgumentException("Entity ${kClass.simpleName} must have a '_id' property")
-        return (idProperty as KProperty1<Any, *>).get(entity) as String
+        val entityClass = entity.javaClass
+        val propertyName = idPropertyCache.getOrPut(entityClass) {
+            val kClass = entityClass.kotlin
+            val idProperty = kClass.memberProperties.find { it.name == "_id" }
+                ?: throw IllegalArgumentException("Entity ${entityClass.simpleName} must have a '_id' property")
+            idProperty.name
+        }
+
+        // Use reflection to get the property value - in a real implementation,
+        // this could be further optimized with method handles or cached getters
+        return entityClass.getDeclaredField(propertyName).apply { isAccessible = true }.get(entity) as String
     }
 
     private fun recordDirty(entityType: String, _id: String, operation: String, ctx: EdgeContext) {
         val dirty = EdgeDirty().apply {
             this.entityType = entityType
             this._id = _id
+            this.operation = operation
+            this.source = ctx.source
+            this.actor = ctx.actor
+            this.reason = ctx.reason
             this.timestamp = System.currentTimeMillis()
         }
         edgeBox.put(dirty)

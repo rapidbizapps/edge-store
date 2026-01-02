@@ -3,8 +3,9 @@ package edgestore
 /**
  * Entity descriptor for type-safe entity identification.
  */
-interface EdgeEntity {
+interface EdgeEntity<T : Any> {
     val name: String
+    val clazz: Class<T>
 }
 
 /**

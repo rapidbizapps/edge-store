@@ -19,5 +19,14 @@ class EdgeDirty {
     @Index
     lateinit var _id: String
 
+    @Index
+    lateinit var operation: String   // CREATE | UPDATE | DELETE
+
+    @Index
+    lateinit var source: String      // ui | sync | p2p
+
     var timestamp: Long = 0
+
+    var actor: String? = null
+    var reason: String? = null
 }

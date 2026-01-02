@@ -2,9 +2,6 @@ package edgestore
 
 import io.objectbox.BoxStore
 import io.objectbox.query.QueryBuilder
-import kotlin.reflect.KClass
-import kotlin.reflect.full.memberProperties
-import kotlin.reflect.jvm.javaField
 
 /**
  * Internal ObjectBox wrapper that resolves entities by business _id (never ObjectBox id).
@@ -21,14 +18,20 @@ internal class EdgeBox(private val boxStore: BoxStore) {
     }
 
     /**
-     * Removes an entity by its business _id.
+     * Removes entities by their business _id.
      */
-    fun remove(entityClass: Class<*>, _id: String) {
+    fun remove(entityClass: Class<*>, _ids: List<String>) {
+        if (_ids.isEmpty()) return
+
         val box = boxStore.boxFor(entityClass)
         val query = box.query()
-            .equal(getIdProperty(entityClass), _id, QueryBuilder.StringOrder.CASE_SENSITIVE)
-            .build()
-        val entities = query.find()
+        if (_ids.size == 1) {
+            query.equal("_id", _ids[0], QueryBuilder.StringOrder.CASE_SENSITIVE)
+        } else {
+            query.`in`("_id", _ids.toTypedArray(), QueryBuilder.StringOrder.CASE_SENSITIVE)
+        }
+
+        val entities = query.build().find()
         if (entities.isNotEmpty()) {
             box.remove(entities)
         }
@@ -36,20 +39,44 @@ internal class EdgeBox(private val boxStore: BoxStore) {
     }
 
     /**
-     * Queries entities based on filters. Filters are field name to value mappings.
+     * Queries entities based on structured filters.
      */
-    fun <T : Any> query(entityClass: Class<T>, filters: Map<String, Any>): List<T> {
+    fun <T : Any> query(entityClass: Class<T>, filters: List<EdgeFilter>): List<T> {
         val box = boxStore.boxFor(entityClass)
         var query = box.query()
 
-        for ((fieldName, value) in filters) {
-            val property = getProperty(entityClass, fieldName)
-            when (value) {
-                is String -> query = query.equal(property, value, QueryBuilder.StringOrder.CASE_SENSITIVE)
-                is Int -> query = query.equal(property, value.toLong())
-                is Long -> query = query.equal(property, value)
-                is Boolean -> query = query.equal(property, value)
-                else -> throw IllegalArgumentException("Unsupported filter value type: ${value::class}")
+        for (filter in filters) {
+            query = when (filter.op) {
+                Op.EQ -> when (filter.value) {
+                    is String -> query.equal(filter.field, filter.value, QueryBuilder.StringOrder.CASE_SENSITIVE)
+                    is Int -> query.equal(filter.field, filter.value.toLong())
+                    is Long -> query.equal(filter.field, filter.value)
+                    is Boolean -> query.equal(filter.field, filter.value)
+                    else -> throw IllegalArgumentException("Unsupported EQ filter value type: ${filter.value::class}")
+                }
+                Op.IN -> when (filter.value) {
+                    is List<*> -> {
+                        val values = filter.value.filterNotNull()
+                        if (values.isEmpty()) continue
+                        when (values[0]) {
+                            is String -> query.`in`(filter.field, values.map { it as String }.toTypedArray(), QueryBuilder.StringOrder.CASE_SENSITIVE)
+                            is Int -> query.`in`(filter.field, values.map { (it as Int).toLong() }.toTypedArray())
+                            is Long -> query.`in`(filter.field, values.map { it as Long }.toTypedArray())
+                            else -> throw IllegalArgumentException("Unsupported IN filter value type: ${values[0]!!::class}")
+                        }
+                    }
+                    else -> throw IllegalArgumentException("IN operation requires List value")
+                }
+                Op.GT -> when (filter.value) {
+                    is Int -> query.greater(filter.field, filter.value.toLong())
+                    is Long -> query.greater(filter.field, filter.value)
+                    else -> throw IllegalArgumentException("Unsupported GT filter value type: ${filter.value::class}")
+                }
+                Op.LT -> when (filter.value) {
+                    is Int -> query.less(filter.field, filter.value.toLong())
+                    is Long -> query.less(filter.field, filter.value)
+                    else -> throw IllegalArgumentException("Unsupported LT filter value type: ${filter.value::class}")
+                }
             }
         }
 
@@ -64,24 +91,10 @@ internal class EdgeBox(private val boxStore: BoxStore) {
     fun <T : Any> getById(entityClass: Class<T>, _id: String): T? {
         val box = boxStore.boxFor(entityClass)
         val query = box.query()
-            .equal(getIdProperty(entityClass), _id, QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .equal("_id", _id, QueryBuilder.StringOrder.CASE_SENSITIVE)
             .build()
         val result = query.findFirst()
         query.close()
         return result
-    }
-
-    private fun getIdProperty(entityClass: Class<*>): String {
-        val kClass = entityClass.kotlin
-        val idProperty = kClass.memberProperties.find { it.name == "_id" }
-            ?: throw IllegalArgumentException("Entity ${entityClass.simpleName} must have a '_id' property")
-        return idProperty.name
-    }
-
-    private fun getProperty(entityClass: Class<*>, propertyName: String): String {
-        val kClass = entityClass.kotlin
-        val property = kClass.memberProperties.find { it.name == propertyName }
-            ?: throw IllegalArgumentException("Property $propertyName not found in ${entityClass.simpleName}")
-        return property.name
     }
 }
