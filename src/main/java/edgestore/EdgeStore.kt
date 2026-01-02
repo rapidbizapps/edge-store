@@ -88,4 +88,9 @@ interface EdgeStore {
         entity: EdgeEntity,
         filters: List<EdgeFilter>
     ): List<T>
+
+    /**
+     * Closes the underlying resources for this EdgeStore instance.
+     */
+    fun close()
 }

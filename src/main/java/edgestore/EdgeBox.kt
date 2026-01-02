@@ -97,4 +97,8 @@ internal class EdgeBox(private val boxStore: BoxStore) {
         query.close()
         return result
     }
+
+    fun close() {
+        boxStore.close()
+    }
 }

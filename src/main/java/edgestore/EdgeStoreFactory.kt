@@ -4,13 +4,13 @@ import io.objectbox.BoxStore
 
 /**
  * Factory for creating EdgeStore instances.
- * Accepts a BoxStore from the consuming app and returns an EdgeStore.
+ * This remains internal to the SDK so application code cannot depend on ObjectBox types.
  */
-object EdgeStoreFactory {
+internal object EdgeStoreFactory {
 
     /**
      * Creates an EdgeStore instance using the provided BoxStore.
-     * @param boxStore The BoxStore instance from the app.
+     * @param boxStore The BoxStore instance managed inside the SDK.
      * @param config Configuration for EdgeStore (optional, defaults provided).
      * @return An EdgeStore instance.
      */
