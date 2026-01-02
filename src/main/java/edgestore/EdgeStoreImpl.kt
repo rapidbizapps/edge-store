@@ -47,6 +47,10 @@ internal class EdgeStoreImpl(
         return edgeBox.query(entity.clazz, filters)
     }
 
+    override fun close() {
+        edgeBox.close()
+    }
+
     private fun validateAndExtractId(entity: Any): String {
         val _id = extractId(entity)
         if (_id.isBlank()) {
