@@ -23,6 +23,8 @@ This rule is enforced by architecture, not convention.
 ```
 App Code
    ↓
+EdgeStoreInitializer (creates & caches EdgeStore per local store)
+   ↓
 EdgeStore  (CRUD + policy)
    ↓
 EdgeBox    (ObjectBox wrapper)
@@ -41,8 +43,8 @@ The app:
 
 - Defines all data models
 - Owns ObjectBox entity annotations
-- Creates the BoxStore at startup
-- Calls EdgeStore for all CRUD operations
+- Initializes local stores exclusively through `EdgeStoreInitializer`
+- Calls `EdgeStore` for all CRUD operations
 
 The app must never:
 
@@ -50,8 +52,21 @@ The app must never:
 - Call Box
 - Call ObjectBox query APIs
 - Manage persistence rules
+- Instantiate EdgeStore directly or bypass `EdgeStoreInitializer`
 
-### 4.2 Models
+### 4.2 EdgeStoreInitializer
+The initializer lives in the SDK and owns ObjectBox bootstrapping so the app never imports
+ObjectBox types.
+
+**EdgeStoreInitializer responsibilities:**
+
+- Accept an Android `Context` and use `applicationContext`
+- Create one `EdgeStore` per `storeName` and reuse it on subsequent lookups
+- Initialize the ObjectBox `BoxStore` in `<app files dir>/objectbox/<storeName>`
+- Provide lifecycle hooks to close a single store or all stores
+- Remain thread-safe while serving concurrent callers
+
+### 4.3 Models
 Models reside in the app, not in EdgeStore.
 
 Models are ObjectBox entities and must include:
@@ -66,7 +81,7 @@ Models are ObjectBox entities and must include:
 - No ObjectBox relations (`ToOne`, `ToMany`) are used
 - Foreign keys are stored explicitly using `_id` strings
 
-### 4.3 EdgeStore (Library API)
+### 4.4 EdgeStore (Library API)
 EdgeStore is the only CRUD interface exposed to app developers.
 
 **EdgeStore responsibilities:**
@@ -85,7 +100,7 @@ EdgeStore is the only CRUD interface exposed to app developers.
 - Not expose ObjectBox types
 - Not leak storage details
 
-### 4.4 EdgeBox (ObjectBox Adapter)
+### 4.5 EdgeBox (ObjectBox Adapter)
 EdgeBox is a thin internal wrapper over ObjectBox.
 
 EdgeBox:

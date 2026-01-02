@@ -45,20 +45,19 @@ class EdgeStoreInitializer(
      * Closes a specific EdgeStore and its underlying BoxStore, removing it from the cache.
      */
     fun close(storeName: String) {
-        val edgeStore = synchronized(lock) { stores.remove(storeName) }
-        edgeStore?.close()
+        synchronized(lock) {
+            stores.remove(storeName)?.close()
+        }
     }
 
     /**
      * Closes all cached EdgeStores and BoxStores.
      */
     fun closeAll() {
-        val edgeStores = synchronized(lock) {
-            val current = stores.values.toList()
+        synchronized(lock) {
+            stores.values.forEach { it.close() }
             stores.clear()
-            current
         }
-        edgeStores.forEach { it.close() }
     }
 
     private fun buildBoxStore(storeName: String): BoxStore {
@@ -68,8 +67,9 @@ class EdgeStoreInitializer(
             dbDir.mkdirs()
         }
 
+        val modelPackage = appContext::class.java.packageName
         val myObjectBoxClass = try {
-            Class.forName("${appContext.packageName}.MyObjectBox")
+            Class.forName("$modelPackage.MyObjectBox")
         } catch (ex: ClassNotFoundException) {
             throw IllegalStateException(
                 "MyObjectBox not found. Ensure ObjectBox annotation processing is configured.",
