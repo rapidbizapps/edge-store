@@ -9,20 +9,20 @@ object EdgeLogger {
 
     private const val TAG = "EdgeStore"
 
-    fun logCreate(entityClass: Class<*>, _id: String) {
-        Log.d(TAG, "CREATE: ${entityClass.simpleName} with _id=$_id")
+    fun logCreate(entity: EdgeEntity, _id: String, ctx: EdgeContext) {
+        Log.d(TAG, "CREATE: ${entity.name} with _id=$_id, source=${ctx.source}, actor=${ctx.actor}, reason=${ctx.reason}")
     }
 
-    fun logUpdate(entityClass: Class<*>, _id: String) {
-        Log.d(TAG, "UPDATE: ${entityClass.simpleName} with _id=$_id")
+    fun logUpdate(entity: EdgeEntity, _id: String, ctx: EdgeContext) {
+        Log.d(TAG, "UPDATE: ${entity.name} with _id=$_id, source=${ctx.source}, actor=${ctx.actor}, reason=${ctx.reason}")
     }
 
-    fun logDelete(entityClass: Class<*>, _id: String) {
-        Log.d(TAG, "DELETE: ${entityClass.simpleName} with _id=$_id")
+    fun logDelete(entity: EdgeEntity, _id: String, ctx: EdgeContext) {
+        Log.d(TAG, "DELETE: ${entity.name} with _id=$_id, source=${ctx.source}, actor=${ctx.actor}, reason=${ctx.reason}")
     }
 
-    fun logQuery(entityClass: Class<*>, filters: Map<String, Any>) {
-        Log.d(TAG, "QUERY: ${entityClass.simpleName} with filters=$filters")
+    fun logQuery(entity: EdgeEntity, filters: List<EdgeFilter>) {
+        Log.d(TAG, "QUERY: ${entity.name} with filters=$filters")
     }
 
     fun logError(message: String, throwable: Throwable? = null) {

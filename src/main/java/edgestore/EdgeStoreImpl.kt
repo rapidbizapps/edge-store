@@ -15,32 +15,37 @@ internal class EdgeStoreImpl(
     private val config: EdgeStoreConfig
 ) : EdgeStore {
 
-    override fun create(entityClass: Class<*>, payload: ByteArray): String {
-        val entity = config.serializer.deserialize(payload, entityClass)
-        val _id = validateAndExtractId(entity)
-        EdgeLogger.logCreate(entityClass, _id)
-        edgeBox.put(entity)
-        recordDirty(entityClass.simpleName, _id, "CREATE")
+    override fun create(entity: EdgeEntity, payload: ByteArray, ctx: EdgeContext): String {
+        val entityClass = Class.forName(entity.name)
+        val deserializedEntity = config.serializer.deserialize(payload, entityClass)
+        val _id = validateAndExtractId(deserializedEntity)
+        EdgeLogger.logCreate(entity, _id, ctx)
+        edgeBox.put(deserializedEntity)
+        recordDirty(entity.name, _id, "CREATE", ctx)
         return _id
     }
 
-    override fun update(entityClass: Class<*>, _id: String, payload: ByteArray) {
-        val entity = config.serializer.deserialize(payload, entityClass)
-        validateId(entity, _id)
-        EdgeLogger.logUpdate(entityClass, _id)
-        edgeBox.put(entity)
-        recordDirty(entityClass.simpleName, _id, "UPDATE")
+    override fun update(entity: EdgeEntity, _id: String, payload: ByteArray, ctx: EdgeContext) {
+        val entityClass = Class.forName(entity.name)
+        val deserializedEntity = config.serializer.deserialize(payload, entityClass)
+        validateId(deserializedEntity, _id)
+        EdgeLogger.logUpdate(entity, _id, ctx)
+        edgeBox.put(deserializedEntity)
+        recordDirty(entity.name, _id, "UPDATE", ctx)
     }
 
-    override fun delete(entityClass: Class<*>, _id: String) {
-        EdgeLogger.logDelete(entityClass, _id)
+    override fun delete(entity: EdgeEntity, _id: String, ctx: EdgeContext) {
+        val entityClass = Class.forName(entity.name)
+        EdgeLogger.logDelete(entity, _id, ctx)
         edgeBox.remove(entityClass, _id)
-        recordDirty(entityClass.simpleName, _id, "DELETE")
+        recordDirty(entity.name, _id, "DELETE", ctx)
     }
 
-    override fun <T : Any> query(entityClass: Class<T>, filters: Map<String, Any>): List<T> {
-        EdgeLogger.logQuery(entityClass, filters)
-        return edgeBox.query(entityClass, filters)
+    override fun <T : Any> query(entity: EdgeEntity, filters: List<EdgeFilter>): List<T> {
+        val entityClass = Class.forName(entity.name) as Class<T>
+        EdgeLogger.logQuery(entity, filters)
+        val mapFilters = filters.associate { it.field to it.value }
+        return edgeBox.query(entityClass, mapFilters)
     }
 
     private fun validateAndExtractId(entity: Any): String {
@@ -65,7 +70,7 @@ internal class EdgeStoreImpl(
         return (idProperty as KProperty1<Any, *>).get(entity) as String
     }
 
-    private fun recordDirty(entityType: String, _id: String, operation: String) {
+    private fun recordDirty(entityType: String, _id: String, operation: String, ctx: EdgeContext) {
         val dirty = EdgeDirty().apply {
             this.entityType = entityType
             this._id = _id
