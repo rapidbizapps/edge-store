@@ -15,6 +15,7 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlinx-serialization'
 
 android {
+    namespace "edgestore"
     compileSdkVersion 34
 
     defaultConfig {
