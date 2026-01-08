@@ -13,6 +13,7 @@ buildscript {
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlinx-serialization'
+apply plugin: 'maven-publish'
 
 android {
     namespace "edgestore"
@@ -31,6 +32,10 @@ android {
     kotlinOptions {
         jvmTarget = '1.8'
     }
+
+    publishing {
+        singleVariant("release")
+    }
 }
 
 repositories {
@@ -41,4 +46,17 @@ repositories {
 dependencies {
     implementation 'io.objectbox:objectbox-android:3.7.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3'
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+                groupId = (findProperty("group") ?: "com.github.rapidbizapps").toString()
+                artifactId = "edge-store"
+                version = (findProperty("version") ?: "local").toString()
+            }
+        }
+    }
 }
