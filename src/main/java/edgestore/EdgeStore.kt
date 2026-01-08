@@ -47,7 +47,7 @@ interface EdgeStore {
      * @return The business identifier (_id) of the created entity.
      */
     fun create(
-        entity: EdgeEntity,
+        entity: EdgeEntity<*>,
         payload: ByteArray,
         ctx: EdgeContext = EdgeContext("ui")
     ): String
@@ -60,7 +60,7 @@ interface EdgeStore {
      * @param ctx The mutation context.
      */
     fun update(
-        entity: EdgeEntity,
+        entity: EdgeEntity<*>,
         _id: String,
         payload: ByteArray,
         ctx: EdgeContext = EdgeContext("ui")
@@ -73,7 +73,7 @@ interface EdgeStore {
      * @param ctx The mutation context.
      */
     fun delete(
-        entity: EdgeEntity,
+        entity: EdgeEntity<*>,
         _id: String,
         ctx: EdgeContext = EdgeContext("ui")
     )
@@ -85,7 +85,7 @@ interface EdgeStore {
      * @return A list of matching entities.
      */
     fun <T : Any> query(
-        entity: EdgeEntity,
+        entity: EdgeEntity<*>,
         filters: List<EdgeFilter>
     ): List<T>
 

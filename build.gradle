@@ -7,16 +7,18 @@ buildscript {
         classpath 'com.android.tools.build:gradle:8.1.4'
         classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0'
         classpath 'org.jetbrains.kotlin:kotlin-serialization:1.9.0'
+        classpath 'io.objectbox:objectbox-gradle-plugin:5.0.1'
     }
 }
 
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
-apply plugin: 'kotlinx-serialization'
+apply plugin: 'org.jetbrains.kotlin.plugin.serialization'
+apply plugin: 'io.objectbox'
 apply plugin: 'maven-publish'
 
 android {
-    namespace "edgestore"
+    namespace "com.github.rapidbizapps.edgestore"
     compileSdkVersion 34
 
     defaultConfig {
@@ -44,7 +46,9 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.objectbox:objectbox-android:3.7.0'
+    implementation 'io.objectbox:objectbox-android:5.0.1'
+    implementation 'io.objectbox:objectbox-kotlin:5.0.1'
+    implementation 'org.jetbrains.kotlin:kotlin-reflect'
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3'
 }
 

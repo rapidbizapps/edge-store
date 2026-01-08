@@ -19,7 +19,7 @@ internal class EdgeStoreImpl(
     private val idPropertyCache = mutableMapOf<Class<*>, String>()
     private val propertyCache = mutableMapOf<Pair<Class<*>, String>, String>()
 
-    override fun create(entity: EdgeEntity, payload: ByteArray, ctx: EdgeContext): String {
+    override fun create(entity: EdgeEntity<*>, payload: ByteArray, ctx: EdgeContext): String {
         val deserializedEntity = config.serializer.deserialize(payload, entity.clazz)
         val _id = validateAndExtractId(deserializedEntity)
         EdgeLogger.logCreate(entity, _id, ctx)
@@ -28,7 +28,7 @@ internal class EdgeStoreImpl(
         return _id
     }
 
-    override fun update(entity: EdgeEntity, _id: String, payload: ByteArray, ctx: EdgeContext) {
+    override fun update(entity: EdgeEntity<*>, _id: String, payload: ByteArray, ctx: EdgeContext) {
         val deserializedEntity = config.serializer.deserialize(payload, entity.clazz)
         validateId(deserializedEntity, _id)
         EdgeLogger.logUpdate(entity, _id, ctx)
@@ -36,13 +36,13 @@ internal class EdgeStoreImpl(
         recordDirty(entity.name, _id, "UPDATE", ctx)
     }
 
-    override fun delete(entity: EdgeEntity, _id: String, ctx: EdgeContext) {
+    override fun delete(entity: EdgeEntity<*>, _id: String, ctx: EdgeContext) {
         EdgeLogger.logDelete(entity, _id, ctx)
         edgeBox.remove(entity.clazz, listOf(_id))
         recordDirty(entity.name, _id, "DELETE", ctx)
     }
 
-    override fun <T : Any> query(entity: EdgeEntity, filters: List<EdgeFilter>): List<T> {
+    override fun <T : Any> query(entity: EdgeEntity<*>, filters: List<EdgeFilter>): List<T> {
         EdgeLogger.logQuery(entity, filters)
         return edgeBox.query(entity.clazz, filters)
     }
