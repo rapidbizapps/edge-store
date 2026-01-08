@@ -1,6 +1,7 @@
 package edgestore.util
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.serializer
 
 /**
  * Pluggable serializer interface for EdgeStore payloads.
@@ -18,11 +19,11 @@ class JsonSerializer : Serializer {
 
     override fun <T> deserialize(payload: ByteArray, clazz: Class<T>): T {
         val jsonString = String(payload, Charsets.UTF_8)
-        return json.decodeFromString(jsonString) as T
+        return json.decodeFromString(serializer(clazz.kotlin), jsonString) as T
     }
 
     override fun serialize(entity: Any): ByteArray {
-        val jsonString = json.encodeToString(entity)
+        val jsonString = json.encodeToString(serializer(entity::class), entity)
         return jsonString.toByteArray(Charsets.UTF_8)
     }
 }
