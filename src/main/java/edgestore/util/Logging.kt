@@ -1,6 +1,9 @@
 package edgestore.util
 
 import android.util.Log
+import edgestore.EdgeContext
+import edgestore.EdgeEntity
+import edgestore.EdgeFilter
 
 /**
  * Logging utilities for EdgeStore operations to maximize debuggability.

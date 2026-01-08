@@ -42,9 +42,10 @@ internal class EdgeStoreImpl(
         recordDirty(entity.name, _id, "DELETE", ctx)
     }
 
+    @Suppress("UNCHECKED_CAST")
     override fun <T : Any> query(entity: EdgeEntity<*>, filters: List<EdgeFilter>): List<T> {
         EdgeLogger.logQuery(entity, filters)
-        return edgeBox.query(entity.clazz, filters)
+        return edgeBox.query(entity.clazz, filters) as List<T>
     }
 
     override fun close() {

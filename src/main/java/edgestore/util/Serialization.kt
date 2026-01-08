@@ -1,13 +1,18 @@
 package edgestore.util
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
+import kotlin.reflect.KClass
+import kotlin.reflect.KType
+import kotlin.reflect.full.createType
+import kotlin.jvm.kotlin
 
 /**
  * Pluggable serializer interface for EdgeStore payloads.
  */
 interface Serializer {
-    fun <T> deserialize(payload: ByteArray, clazz: Class<T>): T
+    fun <T : Any> deserialize(payload: ByteArray, clazz: Class<T>): T
     fun serialize(entity: Any): ByteArray
 }
 
@@ -17,13 +22,20 @@ interface Serializer {
 class JsonSerializer : Serializer {
     private val json = Json { ignoreUnknownKeys = true }
 
-    override fun <T> deserialize(payload: ByteArray, clazz: Class<T>): T {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : Any> deserialize(payload: ByteArray, clazz: Class<T>): T {
         val jsonString = String(payload, Charsets.UTF_8)
-        return json.decodeFromString(serializer(clazz.kotlin), jsonString) as T
+        val kClass: KClass<T> = clazz.kotlin
+        val kType: KType = kClass.createType()
+        val serializer = serializer(kType) as KSerializer<T>
+        return json.decodeFromString(serializer, jsonString)
     }
 
+    @Suppress("UNCHECKED_CAST")
     override fun serialize(entity: Any): ByteArray {
-        val jsonString = json.encodeToString(serializer(entity::class), entity)
+        val kType: KType = entity::class.createType()
+        val serializer = serializer(kType) as KSerializer<Any>
+        val jsonString = json.encodeToString(serializer, entity)
         return jsonString.toByteArray(Charsets.UTF_8)
     }
 }

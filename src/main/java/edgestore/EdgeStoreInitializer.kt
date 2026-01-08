@@ -62,12 +62,11 @@ class EdgeStoreInitializer(
 
     private fun buildBoxStore(storeName: String): BoxStore {
         val dbDir = File(appContext.filesDir, "objectbox/$storeName")
-        val databaseExists = BoxStore.exists(dbDir.absolutePath)
-        if (!databaseExists && !dbDir.exists()) {
+        if (!dbDir.exists()) {
             dbDir.mkdirs()
         }
 
-        val modelPackage = appContext::class.java.packageName
+        val modelPackage = appContext.packageName
         val myObjectBoxClass = try {
             Class.forName("$modelPackage.MyObjectBox")
         } catch (ex: ClassNotFoundException) {
