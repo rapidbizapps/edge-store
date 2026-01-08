@@ -1,0 +1,10 @@
+jdk:
+  - openjdk17
+
+before_install:
+  - sdk install gradle 8.7
+  - sdk use gradle 8.7
+
+install:
+  - gradle --version
+  - gradle --no-daemon -Pgroup=$GROUP -Pversion=$VERSION clean build publishToMavenLocal
