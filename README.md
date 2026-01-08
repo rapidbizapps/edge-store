@@ -7,13 +7,16 @@ EdgeStore is an Android/Kotlin library that enforces a single data-access bounda
 - `EdgeStoreInitializer` owns BoxStore bootstrapping and caches one `EdgeStore` per local store name.
 - Implementation layer validates `_id` presence, writes through `EdgeBox`, and records `EdgeDirty` entries to track local mutations.
 - Pluggable serialization with the default JSON serializer (`kotlinx.serialization`).
-- Thin annotations (`@EdgeModel`, `@EdgeId`) mirror ObjectBox markers so app models stay simple.
+- EdgeStore annotations keep app models decoupled from ObjectBox.
 
 ## Usage
 1. **Define your models and entity descriptors.** Models must include a business `_id` field. Pair each model with an `EdgeEntity` descriptor so the store can map payloads to types.
    ```kotlin
+   @EdgeModel
    @Serializable
    data class Task(
+       @EdgeId
+       var id: Long = 0,
        val _id: String,
        val startTime: Long,
        val endTime: Long?,

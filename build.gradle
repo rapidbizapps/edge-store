@@ -13,6 +13,7 @@ buildscript {
 
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-kapt'
 apply plugin: 'org.jetbrains.kotlin.plugin.serialization'
 apply plugin: 'io.objectbox'
 apply plugin: 'maven-publish'

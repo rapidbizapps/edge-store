@@ -1,13 +1,18 @@
 package edgestore.example
 
 import edgestore.EdgeEntity
+import edgestore.annotation.EdgeId
+import edgestore.annotation.EdgeModel
 import kotlinx.serialization.Serializable
 
 /**
  * Represents a unit of work managed by the app.
  */
+@EdgeModel
 @Serializable
 data class Task(
+    @EdgeId
+    var id: Long = 0,
     val _id: String,
     val startTime: Long,
     val endTime: Long?,
@@ -17,8 +22,11 @@ data class Task(
 /**
  * Captures a single update in a task's lifecycle.
  */
+@EdgeModel
 @Serializable
 data class TaskProgress(
+    @EdgeId
+    var id: Long = 0,
     val _id: String,
     val taskId: String,
     val action: String,
