@@ -5,6 +5,7 @@ import edgestore.EdgeContext
 import edgestore.EdgeFilter
 import edgestore.EdgeStore
 import edgestore.EdgeStoreConfig
+import edgestore.EdgeStoreEngine
 import edgestore.EdgeStoreInitializer
 import edgestore.Op
 import edgestore.util.JsonSerializer
@@ -29,7 +30,10 @@ class ExampleUsage(private val appContext: Context) {
         // Creates or reuses a local ObjectBox-backed store under app files/objectbox/task
         // and returns an EdgeStore facade for it. The store name matches the collection
         // name defined on TaskEntity ("task").
-        val taskStore = edgeStoreInitializer.getOrCreate(storeName = "task")
+        val taskStore = edgeStoreInitializer.getOrCreate(
+            storeName = "task",
+            engine = EdgeStoreEngine.OBJECTBOX
+        )
 
         val task = Task(
             _id = "task-001",
