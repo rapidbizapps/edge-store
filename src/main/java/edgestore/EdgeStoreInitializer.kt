@@ -1,15 +1,11 @@
 package edgestore
 
 import android.content.Context
-import io.objectbox.BoxStore
-import java.io.File
+import edgestore.internal.EdgeStoreFactory
 
 /**
  * Application-facing initializer that wires up EdgeStore instances for one or more
- * ObjectBox-backed local data stores.
- *
- * The initializer owns ObjectBox bootstrapping so the application only depends on
- * EdgeStore, EdgeStoreInitializer, and EdgeStoreConfig.
+ * local data stores.
  */
 class EdgeStoreInitializer(
     context: Context,
@@ -21,16 +17,13 @@ class EdgeStoreInitializer(
     private val stores = mutableMapOf<String, EdgeStore>()
 
     /**
-     * Returns an EdgeStore for the given [storeName], creating it if necessary.
-     * Creates an ObjectBox database directory at <app files dir>/objectbox/<storeName>
-     * and builds a BoxStore using the generated MyObjectBox builder inside the app.
+     * Returns an EdgeStore for the given [storeName] and [engine], creating it if necessary.
      */
-    fun getOrCreate(storeName: String): EdgeStore {
+    fun getOrCreate(storeName: String, engine: EdgeStoreEngine): EdgeStore {
         synchronized(lock) {
             stores[storeName]?.let { return it }
 
-            val boxStore = buildBoxStore(storeName)
-            val edgeStore = EdgeStoreFactory.create(boxStore, config)
+            val edgeStore = EdgeStoreFactory.create(appContext, storeName, engine, config)
             stores[storeName] = edgeStore
             return edgeStore
         }
@@ -58,38 +51,5 @@ class EdgeStoreInitializer(
             stores.values.forEach { it.close() }
             stores.clear()
         }
-    }
-
-    private fun buildBoxStore(storeName: String): BoxStore {
-        val dbDir = File(appContext.filesDir, "objectbox/$storeName")
-        if (!dbDir.exists()) {
-            dbDir.mkdirs()
-        }
-
-        val modelPackage = appContext.packageName
-        val myObjectBoxClass = try {
-            Class.forName("$modelPackage.MyObjectBox")
-        } catch (ex: ClassNotFoundException) {
-            throw IllegalStateException(
-                "MyObjectBox not found. Ensure ObjectBox annotation processing is configured.",
-                ex
-            )
-        }
-
-        val builderMethod = myObjectBoxClass.getMethod("builder")
-        val builder = builderMethod.invoke(null)
-        val builderClass = builder.javaClass
-
-        // Prefer the Android-aware builder configuration when available.
-        val androidContextMethod = builderClass.methods.firstOrNull {
-            it.name == "androidContext" && it.parameterTypes.size == 1 &&
-                Context::class.java.isAssignableFrom(it.parameterTypes[0])
-        }
-        androidContextMethod?.invoke(builder, appContext)
-
-        builderClass.getMethod("directory", File::class.java).invoke(builder, dbDir)
-
-        val buildMethod = builderClass.getMethod("build")
-        return buildMethod.invoke(builder) as BoxStore
     }
 }

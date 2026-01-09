@@ -34,7 +34,10 @@ EdgeStore is an Android/Kotlin library that enforces a single data-access bounda
        appContext,
        EdgeStoreConfig(JsonSerializer())
    )
-   val taskStore = edgeStoreInitializer.getOrCreate(storeName = "task")
+   val taskStore = edgeStoreInitializer.getOrCreate(
+       storeName = "task",
+       engine = EdgeStoreEngine.OBJECTBOX
+   )
    ```
 3. **Perform CRUD through the store.** Serialize your models, call `create`/`update`/`delete`, and issue structured `query` calls.
    ```kotlin
