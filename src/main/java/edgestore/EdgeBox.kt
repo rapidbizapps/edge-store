@@ -1,154 +1,202 @@
 package edgestore
 
+import edgestore.util.Serializer
+import io.objectbox.Box
 import io.objectbox.BoxStore
-import io.objectbox.Property
 import io.objectbox.query.QueryBuilder
 
 /**
- * Internal ObjectBox wrapper that resolves entities by business _id (never ObjectBox id).
- * Exposes minimal put, remove, query helpers with NO business logic or validation.
+ * Internal ObjectBox wrapper that stores all entities as EdgeRecord entries.
+ * This keeps ObjectBox completely hidden from client applications.
+ *
+ * All user entities are serialized to JSON and stored in EdgeRecord.
+ * Queries filter by entityType and deserialize matching records.
  */
-internal class EdgeBox(private val boxStore: BoxStore) {
+internal class EdgeBox(
+    private val boxStore: BoxStore,
+    private val serializer: Serializer
+) {
 
-    // Cache for Property lookups per entity class and field name
-    private val propertyCache = mutableMapOf<Pair<Class<*>, String>, Property<*>>()
+    private val recordBox: Box<EdgeRecord>
+        get() = boxStore.boxFor(EdgeRecord::class.java)
+
+    private val dirtyBox: Box<EdgeDirty>
+        get() = boxStore.boxFor(EdgeDirty::class.java)
 
     /**
-     * Puts an entity into the store. If an entity with the same _id exists, it is replaced.
+     * Puts an entity into the store by serializing it to an EdgeRecord.
+     * If an entity with the same _id and entityType exists, it is replaced.
+     *
+     * @param entityType The entity type name
+     * @param _id The business identifier
+     * @param entity The entity to store
+     * @return The stored EdgeRecord's ObjectBox ID
      */
-    fun put(entity: Any) {
-        val box = boxStore.boxFor(entity.javaClass)
-        box.put(entity)
+    fun put(entityType: String, _id: String, entity: Any): Long {
+        val payload = String(serializer.serialize(entity), Charsets.UTF_8)
+        val now = System.currentTimeMillis()
+
+        // Check if record exists
+        val existing = findRecord(entityType, _id)
+
+        val record = existing ?: EdgeRecord().apply {
+            this._id = _id
+            this.entityType = entityType
+            this.createdAt = now
+        }
+
+        record.payload = payload
+        record.updatedAt = now
+
+        return recordBox.put(record)
     }
 
     /**
      * Removes entities by their business _id.
      */
-    @Suppress("UNCHECKED_CAST")
-    fun <T : Any> remove(entityClass: Class<T>, _ids: List<String>) {
+    fun remove(entityType: String, _ids: List<String>) {
         if (_ids.isEmpty()) return
 
-        val box = boxStore.boxFor(entityClass)
-        val idProperty = getProperty(entityClass, "_id") as Property<T>
-        
-        val query = box.query()
+        val query = recordBox.query()
+            .equal(EdgeRecord_.entityType, entityType, QueryBuilder.StringOrder.CASE_SENSITIVE)
+
         if (_ids.size == 1) {
-            query.equal(idProperty, _ids[0], QueryBuilder.StringOrder.CASE_SENSITIVE)
+            query.equal(EdgeRecord_._id, _ids[0], QueryBuilder.StringOrder.CASE_SENSITIVE)
         } else {
-            query.`in`(idProperty, _ids.toTypedArray(), QueryBuilder.StringOrder.CASE_SENSITIVE)
+            query.`in`(EdgeRecord_._id, _ids.toTypedArray(), QueryBuilder.StringOrder.CASE_SENSITIVE)
         }
 
-        val entities = query.build().find()
-        if (entities.isNotEmpty()) {
-            box.remove(entities)
+        val records = query.build().find()
+        if (records.isNotEmpty()) {
+            recordBox.remove(records)
         }
         query.close()
     }
 
     /**
      * Queries entities based on structured filters.
+     * Filters by entityType first, then applies additional filters in memory.
      */
-    @Suppress("UNCHECKED_CAST")
-    fun <T : Any> query(entityClass: Class<T>, filters: List<EdgeFilter>): List<T> {
-        val box = boxStore.boxFor(entityClass)
-        var query = box.query()
+    fun <T : Any> query(entityType: String, clazz: Class<T>, filters: List<EdgeFilter>): List<T> {
+        // Get all records of this entity type
+        val query = recordBox.query()
+            .equal(EdgeRecord_.entityType, entityType, QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .build()
 
-        for (filter in filters) {
-            val property = getProperty(entityClass, filter.field) as Property<T>
-            
-            query = when (filter.op) {
-                Op.EQ -> when (filter.value) {
-                    is String -> query.equal(property, filter.value, QueryBuilder.StringOrder.CASE_SENSITIVE)
-                    is Int -> query.equal(property, filter.value.toLong())
-                    is Long -> query.equal(property, filter.value)
-                    is Boolean -> query.equal(property, filter.value)
-                    else -> throw IllegalArgumentException("Unsupported EQ filter value type: ${filter.value::class}")
-                }
-                Op.IN -> when (filter.value) {
-                    is List<*> -> {
-                        val values = filter.value.filterNotNull()
-                        if (values.isEmpty()) continue
-                        when (values[0]) {
-                            is String -> query.`in`(property, values.map { it as String }.toTypedArray(), QueryBuilder.StringOrder.CASE_SENSITIVE)
-                            is Int -> query.`in`(property, values.map { (it as Int).toLong() }.toLongArray())
-                            is Long -> query.`in`(property, values.map { it as Long }.toLongArray())
-                            else -> throw IllegalArgumentException("Unsupported IN filter value type: ${values[0]!!::class}")
-                        }
-                    }
-                    else -> throw IllegalArgumentException("IN operation requires List value")
-                }
-                Op.GT -> when (filter.value) {
-                    is Int -> query.greater(property, filter.value.toLong())
-                    is Long -> query.greater(property, filter.value)
-                    else -> throw IllegalArgumentException("Unsupported GT filter value type: ${filter.value::class}")
-                }
-                Op.LT -> when (filter.value) {
-                    is Int -> query.less(property, filter.value.toLong())
-                    is Long -> query.less(property, filter.value)
-                    else -> throw IllegalArgumentException("Unsupported LT filter value type: ${filter.value::class}")
-                }
+        val records = query.find()
+        query.close()
+
+        // Deserialize and filter in memory
+        val entities = records.mapNotNull { record ->
+            try {
+                serializer.deserialize(record.payload.toByteArray(Charsets.UTF_8), clazz)
+            } catch (e: Exception) {
+                null
             }
         }
 
-        val result = query.build().find()
-        query.close()
-        return result
+        // Apply filters in memory
+        return if (filters.isEmpty()) {
+            entities
+        } else {
+            entities.filter { entity -> matchesFilters(entity, filters) }
+        }
     }
 
     /**
      * Retrieves an entity by its business _id.
      */
-    @Suppress("UNCHECKED_CAST")
-    fun <T : Any> getById(entityClass: Class<T>, _id: String): T? {
-        val box = boxStore.boxFor(entityClass)
-        val idProperty = getProperty(entityClass, "_id") as Property<T>
-        
-        val query = box.query()
-            .equal(idProperty, _id, QueryBuilder.StringOrder.CASE_SENSITIVE)
-            .build()
-        val result = query.findFirst()
-        query.close()
-        return result
+    fun <T : Any> getById(entityType: String, clazz: Class<T>, _id: String): T? {
+        val record = findRecord(entityType, _id) ?: return null
+        return try {
+            serializer.deserialize(record.payload.toByteArray(Charsets.UTF_8), clazz)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Puts a dirty record for mutation tracking.
+     */
+    fun putDirty(dirty: EdgeDirty) {
+        dirtyBox.put(dirty)
     }
 
     fun close() {
         boxStore.close()
     }
 
+    private fun findRecord(entityType: String, _id: String): EdgeRecord? {
+        val query = recordBox.query()
+            .equal(EdgeRecord_.entityType, entityType, QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .equal(EdgeRecord_._id, _id, QueryBuilder.StringOrder.CASE_SENSITIVE)
+            .build()
+        val result = query.findFirst()
+        query.close()
+        return result
+    }
+
     /**
-     * Gets an ObjectBox Property object for a given entity class and field name.
-     * Uses reflection to find the Property from the generated EntityName_ class.
+     * Checks if an entity matches all the given filters.
+     */
+    private fun matchesFilters(entity: Any, filters: List<EdgeFilter>): Boolean {
+        for (filter in filters) {
+            if (!matchesFilter(entity, filter)) {
+                return false
+            }
+        }
+        return true
+    }
+
+    /**
+     * Checks if an entity matches a single filter using reflection.
+     */
+    private fun matchesFilter(entity: Any, filter: EdgeFilter): Boolean {
+        val fieldValue = getFieldValue(entity, filter.field) ?: return false
+
+        return when (filter.op) {
+            Op.EQ -> fieldValue == filter.value
+            Op.IN -> {
+                val values = filter.value as? List<*> ?: return false
+                values.contains(fieldValue)
+            }
+            Op.GT -> compareValues(fieldValue, filter.value) > 0
+            Op.LT -> compareValues(fieldValue, filter.value) < 0
+        }
+    }
+
+    /**
+     * Gets a field value from an entity using reflection.
+     */
+    private fun getFieldValue(entity: Any, fieldName: String): Any? {
+        return try {
+            val field = entity.javaClass.getDeclaredField(fieldName)
+            field.isAccessible = true
+            field.get(entity)
+        } catch (e: NoSuchFieldException) {
+            // Try getter method
+            try {
+                val getter = entity.javaClass.getMethod("get${fieldName.replaceFirstChar { it.uppercase() }}")
+                getter.invoke(entity)
+            } catch (e: Exception) {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Compares two values for GT/LT operations.
      */
     @Suppress("UNCHECKED_CAST")
-    private fun getProperty(entityClass: Class<*>, fieldName: String): Property<*> {
-        val cacheKey = entityClass to fieldName
-        propertyCache[cacheKey]?.let { return it }
-
-        // ObjectBox generates a class named "EntityName_" with static Property fields
-        val underscoreClassName = "${entityClass.name}_"
-        val underscoreClass = try {
-            Class.forName(underscoreClassName)
-        } catch (e: ClassNotFoundException) {
-            throw IllegalArgumentException(
-                "Generated ObjectBox class $underscoreClassName not found. " +
-                "Ensure ObjectBox annotation processing is configured for ${entityClass.simpleName}.",
-                e
-            )
+    private fun compareValues(a: Any, b: Any): Int {
+        return when {
+            a is Number && b is Number -> a.toDouble().compareTo(b.toDouble())
+            a is Comparable<*> && b is Comparable<*> -> {
+                (a as Comparable<Any>).compareTo(b)
+            }
+            else -> 0
         }
-
-        // Find the Property field matching the fieldName
-        val propertyField = try {
-            underscoreClass.getField(fieldName)
-        } catch (e: NoSuchFieldException) {
-            throw IllegalArgumentException(
-                "Property '$fieldName' not found in ${entityClass.simpleName}. " +
-                "Ensure the field exists and is annotated properly.",
-                e
-            )
-        }
-
-        val property = propertyField.get(null) as Property<*>
-        propertyCache[cacheKey] = property
-        return property
     }
 }

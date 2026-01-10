@@ -59,10 +59,53 @@
         }
       ],
       "relations": []
+    },
+    {
+      "id": "2:8269858173959796201",
+      "lastPropertyId": "6:5016270282187384309",
+      "name": "EdgeRecord",
+      "properties": [
+        {
+          "id": "1:3723371839295148757",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:5299120508285354744",
+          "name": "_id",
+          "indexId": "5:4615216627216893728",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "3:4526170461761363778",
+          "name": "entityType",
+          "indexId": "6:3284648407015987380",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "4:6211375029710306928",
+          "name": "payload",
+          "type": 9
+        },
+        {
+          "id": "5:6281456551668632093",
+          "name": "createdAt",
+          "type": 6
+        },
+        {
+          "id": "6:5016270282187384309",
+          "name": "updatedAt",
+          "type": 6
+        }
+      ],
+      "relations": []
     }
   ],
-  "lastEntityId": "1:3034957807401497546",
-  "lastIndexId": "4:41637977288863540",
+  "lastEntityId": "2:8269858173959796201",
+  "lastIndexId": "6:3284648407015987380",
   "lastRelationId": "0:0",
   "lastSequenceId": "0:0",
   "modelVersion": 5,

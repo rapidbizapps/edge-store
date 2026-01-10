@@ -87,6 +87,14 @@ object Edge {
      * Check if Edge has been initialized.
      */
     fun isInitialized(): Boolean = initializer != null
+
+    /**
+     * Returns the underlying BoxStore for admin/debugging purposes.
+     * Internal use only - used by EdgeAdmin.
+     */
+    internal fun getBoxStore(storeName: String = defaultStoreName): Any? {
+        return initializer?.getBoxStore(storeName)
+    }
 }
 
 /**

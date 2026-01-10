@@ -15,7 +15,7 @@ internal object EdgeStoreFactory {
      * @return An EdgeStore instance.
      */
     fun create(boxStore: BoxStore, config: EdgeStoreConfig = EdgeStoreConfig()): EdgeStore {
-        val edgeBox = EdgeBox(boxStore)
+        val edgeBox = EdgeBox(boxStore, config.serializer)
         return EdgeStoreImpl(edgeBox, config)
     }
 }

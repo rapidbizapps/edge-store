@@ -11,11 +11,12 @@ buildscript {
     }
 }
 
+ext.objectboxVersion = '5.0.1'
+
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-kapt'
 apply plugin: 'org.jetbrains.kotlin.plugin.serialization'
-apply plugin: 'io.objectbox'
 apply plugin: 'maven-publish'
 
 android {
@@ -51,11 +52,18 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.objectbox:objectbox-android:5.0.1'
-    implementation 'io.objectbox:objectbox-kotlin:5.0.1'
+    // Manually add objectbox-android-objectbrowser only for debug builds,
+    // and objectbox-android for release builds.
+    debugImplementation("io.objectbox:objectbox-android-objectbrowser:$objectboxVersion")
+    releaseImplementation("io.objectbox:objectbox-android:$objectboxVersion")
     implementation 'org.jetbrains.kotlin:kotlin-reflect'
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3'
+
 }
+
+// Apply the plugin after the dependencies block so it picks up
+// and does not add objectbox-android.
+apply plugin: 'io.objectbox'
 
 afterEvaluate {
     publishing {
