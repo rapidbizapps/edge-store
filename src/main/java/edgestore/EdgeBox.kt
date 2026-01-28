@@ -6,11 +6,13 @@ import io.objectbox.BoxStore
 import io.objectbox.query.QueryBuilder
 
 /**
- * Internal ObjectBox wrapper that stores all entities as EdgeRecord entries.
- * This keeps ObjectBox completely hidden from client applications.
+ * Internal ObjectBox wrapper that supports two modes:
  *
- * All user entities are serialized to JSON and stored in EdgeRecord.
- * Queries filter by entityType and deserialize matching records.
+ * 1. **Direct entity mode**: User entities extend BaseModel and are actual ObjectBox entities.
+ *    Use boxFor<T>() to get a Box for direct CRUD operations.
+ *
+ * 2. **JSON serialization mode**: User entities are stored as JSON in EdgeRecord.
+ *    Use put(), remove(), query() methods for serialized storage.
  */
 internal class EdgeBox(
     private val boxStore: BoxStore,
@@ -22,6 +24,17 @@ internal class EdgeBox(
 
     private val dirtyBox: Box<EdgeDirty>
         get() = boxStore.boxFor(EdgeDirty::class.java)
+
+    /**
+     * Returns a Box for direct entity operations.
+     * Use this when entities extend BaseModel and are actual ObjectBox entities.
+     *
+     * @param clazz The entity class
+     * @return A Box for the entity type
+     */
+    fun <T : Any> boxFor(clazz: Class<T>): Box<T> {
+        return boxStore.boxFor(clazz)
+    }
 
     /**
      * Puts an entity into the store by serializing it to an EdgeRecord.

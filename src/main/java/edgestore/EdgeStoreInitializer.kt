@@ -11,30 +11,66 @@ import java.io.File
  * Application-facing initializer that wires up EdgeStore instances for one or more
  * ObjectBox-backed local data stores.
  *
- * The initializer owns ObjectBox bootstrapping internally - the application does NOT
- * need ObjectBox annotations or the ObjectBox plugin. All ObjectBox entities are
- * internal to the edge-store library.
+ * Two initialization modes:
+ * 1. **External BoxStore** (recommended): App provides BoxStore with all entities.
+ *    Use this for direct entity CRUD where entities extend BaseModel.
+ *
+ * 2. **Internal BoxStore**: Edge-store creates its own BoxStore.
+ *    Use this for JSON serialization mode where user entities are stored in EdgeRecord.
  */
-class EdgeStoreInitializer(
-    context: Context,
-    private val config: EdgeStoreConfig = EdgeStoreConfig()
-) {
+class EdgeStoreInitializer {
 
-    private val appContext = context.applicationContext
+    private val appContext: Context?
+    private val externalBoxStore: BoxStore?
+    private val config: EdgeStoreConfig
     private val lock = Any()
     private val stores = mutableMapOf<String, EdgeStore>()
     private val boxStores = mutableMapOf<String, BoxStore>()
 
     /**
+     * Initialize with an external BoxStore provided by the app.
+     * The BoxStore should include all entities (app's + edge-store's).
+     */
+    constructor(boxStore: BoxStore, config: EdgeStoreConfig = EdgeStoreConfig()) {
+        this.externalBoxStore = boxStore
+        this.config = config
+        this.appContext = null
+        // Register the external BoxStore as the default store
+        boxStores["default"] = boxStore
+    }
+
+    /**
+     * Initialize with Android context - creates internal BoxStore.
+     * Use for JSON serialization mode only.
+     */
+    constructor(context: Context, config: EdgeStoreConfig = EdgeStoreConfig()) {
+        this.appContext = context.applicationContext
+        this.config = config
+        this.externalBoxStore = null
+    }
+
+    /**
      * Returns an EdgeStore for the given [storeName], creating it if necessary.
-     * Creates an ObjectBox database directory at <app files dir>/objectbox/<storeName>
-     * and builds a BoxStore using the library's internal MyObjectBox.
+     *
+     * If initialized with external BoxStore, uses that store directly.
+     * Otherwise, creates an ObjectBox database at <app files dir>/objectbox/<storeName>.
      */
     fun getOrCreate(storeName: String): EdgeStore {
         synchronized(lock) {
             stores[storeName]?.let { return it }
 
-            val boxStore = buildBoxStore(storeName)
+            val boxStore = if (externalBoxStore != null && storeName == "default") {
+                // Use the external BoxStore for the default store
+                externalBoxStore
+            } else if (appContext != null) {
+                // Build internal BoxStore
+                buildBoxStore(storeName)
+            } else {
+                throw IllegalStateException(
+                    "Cannot create store '$storeName'. External BoxStore only supports 'default' store name."
+                )
+            }
+
             boxStores[storeName] = boxStore
             val edgeStore = EdgeStoreFactory.create(boxStore, config)
             stores[storeName] = edgeStore
@@ -77,18 +113,21 @@ class EdgeStoreInitializer(
     }
 
     private fun buildBoxStore(storeName: String): BoxStore {
-        val dbDir = File(appContext.filesDir, "objectbox/$storeName")
+        val context = appContext
+            ?: throw IllegalStateException("Cannot build BoxStore without context")
+
+        val dbDir = File(context.filesDir, "objectbox/$storeName")
         if (!dbDir.exists()) {
             dbDir.mkdirs()
         }
 
         // Use the library's internal MyObjectBox - not the app's
-        val boxStore1 =  MyObjectBox.builder()
-            .androidContext(appContext)
+        val boxStore1 = MyObjectBox.builder()
+            .androidContext(context)
             .directory(dbDir)
             .build()
-        val started = Admin(boxStore1).start(appContext)
-        Log.i("ObjectBoxAdmin", "Started: " + started)
+        val started = Admin(boxStore1).start(context)
+        Log.i("ObjectBoxAdmin", "Started: $started")
         return boxStore1
     }
 }

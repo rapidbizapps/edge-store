@@ -45,6 +45,61 @@ internal class EdgeStoreImpl(
         edgeBox.close()
     }
 
+    // =========================================================================
+    // Direct Entity Mode Implementation
+    // =========================================================================
+
+    override fun <T : Any> findAllDirect(clazz: Class<T>): List<T> {
+        return edgeBox.boxFor(clazz).all
+    }
+
+    override fun <T : Any> findByIdDirect(clazz: Class<T>, id: Long): T? {
+        return edgeBox.boxFor(clazz).get(id)
+    }
+
+    override fun <T : Any> findByBusinessIdDirect(clazz: Class<T>, _id: String): T? {
+        // Query by _id field (from BaseModel)
+        val box = edgeBox.boxFor(clazz)
+        // Use reflection to find the _id property
+        return box.all.find { entity ->
+            try {
+                val field = entity.javaClass.getDeclaredField("_id")
+                field.isAccessible = true
+                field.get(entity) == _id
+            } catch (e: Exception) {
+                // Try superclass (BaseModel)
+                try {
+                    val field = entity.javaClass.superclass?.getDeclaredField("_id")
+                    field?.isAccessible = true
+                    field?.get(entity) == _id
+                } catch (e: Exception) {
+                    false
+                }
+            }
+        }
+    }
+
+    override fun <T : Any> putDirect(entity: T): Long {
+        @Suppress("UNCHECKED_CAST")
+        val box = edgeBox.boxFor(entity.javaClass as Class<T>)
+        return box.put(entity)
+    }
+
+    override fun <T : Any> putAllDirect(entities: List<T>) {
+        if (entities.isEmpty()) return
+        @Suppress("UNCHECKED_CAST")
+        val box = edgeBox.boxFor(entities.first().javaClass as Class<T>)
+        box.put(entities)
+    }
+
+    override fun <T : Any> removeDirect(clazz: Class<T>, id: Long) {
+        edgeBox.boxFor(clazz).remove(id)
+    }
+
+    // =========================================================================
+    // Private helpers
+    // =========================================================================
+
     private fun validateAndExtractId(entity: Any): String {
         val _id = extractId(entity)
         if (_id.isBlank()) {

@@ -36,11 +36,19 @@ data class EdgeContext(
 /**
  * The public API for EdgeStore, enforcing CRUD operations exclusively through this interface.
  * Application developers must never call ObjectBox APIs directly.
+ *
+ * Two modes are supported:
+ * 1. **JSON serialization**: Entities are stored as JSON in EdgeRecord
+ * 2. **Direct entities**: Entities extend BaseModel and are actual ObjectBox entities
  */
 interface EdgeStore {
 
+    // =========================================================================
+    // JSON Serialization Mode (Legacy)
+    // =========================================================================
+
     /**
-     * Creates a new entity instance.
+     * Creates a new entity instance (JSON serialization mode).
      * @param entity The entity descriptor.
      * @param payload The serialized payload of the entity.
      * @param ctx The mutation context.
@@ -53,7 +61,7 @@ interface EdgeStore {
     ): String
 
     /**
-     * Updates an existing entity.
+     * Updates an existing entity (JSON serialization mode).
      * @param entity The entity descriptor.
      * @param _id The business identifier of the entity to update.
      * @param payload The serialized payload of the updated entity.
@@ -67,7 +75,7 @@ interface EdgeStore {
     )
 
     /**
-     * Deletes an entity.
+     * Deletes an entity (JSON serialization mode).
      * @param entity The entity descriptor.
      * @param _id The business identifier of the entity to delete.
      * @param ctx The mutation context.
@@ -79,7 +87,7 @@ interface EdgeStore {
     )
 
     /**
-     * Queries entities based on filters.
+     * Queries entities based on filters (JSON serialization mode).
      * @param entity The entity descriptor.
      * @param filters A list of structured filters for querying.
      * @return A list of matching entities.
@@ -88,6 +96,60 @@ interface EdgeStore {
         entity: EdgeEntity<*>,
         filters: List<EdgeFilter>
     ): List<T>
+
+    // =========================================================================
+    // Direct Entity Mode (Recommended)
+    // =========================================================================
+
+    /**
+     * Find all entities of the given type (direct entity mode).
+     * Use this when entities extend BaseModel.
+     *
+     * @param clazz The entity class
+     * @return List of all entities
+     */
+    fun <T : Any> findAllDirect(clazz: Class<T>): List<T>
+
+    /**
+     * Find entity by ObjectBox ID (direct entity mode).
+     *
+     * @param clazz The entity class
+     * @param id The ObjectBox primary key
+     * @return The entity or null
+     */
+    fun <T : Any> findByIdDirect(clazz: Class<T>, id: Long): T?
+
+    /**
+     * Find entity by business _id (direct entity mode).
+     *
+     * @param clazz The entity class
+     * @param _id The business identifier
+     * @return The entity or null
+     */
+    fun <T : Any> findByBusinessIdDirect(clazz: Class<T>, _id: String): T?
+
+    /**
+     * Put (insert or update) an entity (direct entity mode).
+     *
+     * @param entity The entity to save
+     * @return The ObjectBox ID
+     */
+    fun <T : Any> putDirect(entity: T): Long
+
+    /**
+     * Put multiple entities (direct entity mode).
+     *
+     * @param entities The entities to save
+     */
+    fun <T : Any> putAllDirect(entities: List<T>)
+
+    /**
+     * Remove an entity by ObjectBox ID (direct entity mode).
+     *
+     * @param clazz The entity class
+     * @param id The ObjectBox primary key
+     */
+    fun <T : Any> removeDirect(clazz: Class<T>, id: Long)
 
     /**
      * Closes the underlying resources for this EdgeStore instance.

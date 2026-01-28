@@ -58,7 +58,8 @@ dependencies {
     releaseImplementation("io.objectbox:objectbox-android:$objectboxVersion")
     implementation 'org.jetbrains.kotlin:kotlin-reflect'
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3'
-
+    // Gson for reflection-based serialization (no annotations needed on data classes)
+    implementation 'com.google.code.gson:gson:2.10.1'
 }
 
 // Apply the plugin after the dependencies block so it picks up

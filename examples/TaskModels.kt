@@ -1,126 +1,114 @@
 package edgestore.example
 
-import edgestore.EdgeEntity
-import edgestore.EdgeFilter
-import edgestore.EntityDao
-import edgestore.Op
-import edgestore.annotation.EdgeId
-import edgestore.annotation.EdgeModel
-import kotlinx.serialization.Serializable
+import edgestore.BaseModel
+import edgestore.Entity    // From edge-store, not io.objectbox!
+import edgestore.Index
+
+// ============================================================================
+// Example Entities - ZERO ObjectBox Imports!
+// Just import from `edgestore` package and extend BaseModel
+// ============================================================================
 
 /**
  * Represents a unit of work managed by the app.
+ *
+ * By extending [BaseModel], you get these fields automatically:
+ * - `id: Long` - ObjectBox primary key (auto-assigned)
+ * - `_id: String` - Business identifier (indexed)
+ * - `createdAt: Long` - Creation timestamp
+ * - `updatedAt: Long` - Last modification timestamp
+ *
+ * Notice: Only `@Entity` annotation needed, imported from `edgestore`!
  */
-@EdgeModel
-@Serializable
-data class Task(
-    @EdgeId
-    var id: Long = 0,
-    val _id: String,
-    val startTime: Long,
-    val endTime: Long?,
-    val status: String
-)
+@Entity
+class Task() : BaseModel() {
+    var startTime: Long = 0
+    var endTime: Long? = null
+
+    @Index
+    lateinit var status: String
+
+    /**
+     * Convenience constructor for creating Task instances.
+     */
+    constructor(
+        _id: String,
+        startTime: Long,
+        endTime: Long? = null,
+        status: String
+    ) : this() {
+        this._id = _id
+        this.startTime = startTime
+        this.endTime = endTime
+        this.status = status
+    }
+}
 
 /**
  * Captures a single update in a task's lifecycle.
  */
-@EdgeModel
-@Serializable
-data class TaskProgress(
-    @EdgeId
-    var id: Long = 0,
-    val _id: String,
-    val taskId: String,
-    val action: String,
-    val timestamp: Long
+@Entity
+class TaskProgress() : BaseModel() {
+    @Index
+    lateinit var taskId: String
+
+    lateinit var action: String
+    var timestamp: Long = 0
+
+    constructor(
+        _id: String,
+        taskId: String,
+        action: String,
+        timestamp: Long
+    ) : this() {
+        this._id = _id
+        this.taskId = taskId
+        this.action = action
+        this.timestamp = timestamp
+    }
+}
+
+/**
+ * Example project entity.
+ */
+@Entity
+class Project() : BaseModel() {
+    lateinit var name: String
+    var description: String = ""
+
+    constructor(_id: String, name: String, description: String = "") : this() {
+        this._id = _id
+        this.name = name
+        this.description = description
+    }
+}
+
+// ============================================================================
+// Usage Examples
+// ============================================================================
+
+/*
+// Creating entities
+val task = Task(
+    _id = "task-001",
+    startTime = System.currentTimeMillis(),
+    status = "running"
 )
 
-/**
- * EdgeEntity descriptor for Task so it can be persisted with EdgeStore.
- */
-object TaskEntity : EdgeEntity<Task> {
-    override val name: String = "task"
-    override val clazz: Class<Task> = Task::class.java
-}
+val progress = TaskProgress(
+    _id = "progress-001",
+    taskId = "task-001",
+    action = "started",
+    timestamp = System.currentTimeMillis()
+)
 
-/**
- * EdgeEntity descriptor for TaskProgress so it can be persisted with EdgeStore.
- */
-object TaskProgressEntity : EdgeEntity<TaskProgress> {
-    override val name: String = "taskProgress"
-    override val clazz: Class<TaskProgress> = TaskProgress::class.java
-}
+// With ObjectBox BoxStore (in your main project)
+val box = boxStore.boxFor(Task::class.java)
+box.put(task)
 
-// ============================================================================
-// DAO Objects - Type-safe query interfaces for application code
-// ============================================================================
-
-/**
- * DAO for Task entities.
- *
- * Usage:
- * ```
- * val allTasks = Tasks.findAll()
- * val task = Tasks.findById("task-001")
- * val runningTasks = Tasks.findByStatus("running")
- * ```
- */
-object Tasks : EntityDao<Task>(Task::class, TaskEntity) {
-
-    /**
-     * Find all tasks with the given status.
-     */
-    fun findByStatus(status: String): List<Task> =
-        find(listOf(EdgeFilter("status", Op.EQ, status)))
-
-    /**
-     * Find all tasks that are currently running (status = "running").
-     */
-    fun findRunning(): List<Task> = findByStatus("running")
-
-    /**
-     * Find all tasks that have completed (status = "completed").
-     */
-    fun findCompleted(): List<Task> = findByStatus("completed")
-}
-
-/**
- * DAO for TaskProgress entities.
- *
- * Usage:
- * ```
- * val allProgress = TaskProgresses.findAll()
- * val progress = TaskProgresses.findByTaskId("task-001")
- * ```
- */
-object TaskProgresses : EntityDao<TaskProgress>(TaskProgress::class, TaskProgressEntity) {
-
-    /**
-     * Find all progress entries for a specific task.
-     *
-     * @param taskId The business identifier of the task
-     * @return List of progress entries for the task, ordered by timestamp
-     */
-    fun findByTaskId(taskId: String): List<TaskProgress> =
-        find(listOf(EdgeFilter("taskId", Op.EQ, taskId)))
-
-    /**
-     * Find all progress entries for multiple tasks.
-     *
-     * @param taskIds The business identifiers of the tasks
-     * @return List of progress entries for all specified tasks
-     */
-    fun findByTaskIds(taskIds: List<String>): List<TaskProgress> =
-        if (taskIds.isEmpty()) emptyList()
-        else findIn("taskId", taskIds)
-
-    /**
-     * Find all progress entries with a specific action.
-     *
-     * @param action The action to filter by (e.g., "started", "checkpoint reached")
-     * @return List of progress entries with the specified action
-     */
-    fun findByAction(action: String): List<TaskProgress> =
-        find(listOf(EdgeFilter("action", Op.EQ, action)))
-}
+val allTasks = box.all
+val runningTasks = box.query()
+    .equal(Task_.status, "running", QueryBuilder.StringOrder.CASE_SENSITIVE)
+    .build()
+    .find()
+*/
