@@ -1,0 +1,5 @@
+/build/intermediates
+/.gradle/
+local.properties
+.gradle/
+/build

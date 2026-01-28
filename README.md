@@ -244,7 +244,7 @@ App Code (ViewModels, Repositories)
 
 ## Building
 
-Use Gradle with the Android and Kotlin plugins declared in [`build.gradle`](build.gradle):
+Use Gradle with the Android and Kotlin plugins declared in [`build.gradle`](build.gradle.kts):
 
 ```bash
 ./gradlew assemble        # Build library artifacts

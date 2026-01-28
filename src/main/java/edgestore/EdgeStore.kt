@@ -12,7 +12,11 @@ interface EdgeEntity<T : Any> {
  * Query operation types for filters.
  */
 enum class Op {
-    EQ, IN, GT, LT
+    EQ, IN, GT, LT, NEQ, NULLORMISSING, NOTNULL
+}
+
+enum class OpC {
+    AND,OR,JOIN
 }
 
 /**
@@ -21,7 +25,8 @@ enum class Op {
 data class EdgeFilter(
     val field: String,
     val op: Op,
-    val value: Any
+    val value: Any,
+    val joinOp: OpC? = null
 )
 
 /**
@@ -42,13 +47,13 @@ interface EdgeStore {
     /**
      * Creates a new entity instance.
      * @param entity The entity descriptor.
-     * @param payload The serialized payload of the entity.
+     * @param data The entity object to store.
      * @param ctx The mutation context.
      * @return The business identifier (_id) of the created entity.
      */
-    fun create(
-        entity: EdgeEntity<*>,
-        payload: ByteArray,
+    fun <T : Any> create(
+        entity: EdgeEntity<T>,
+        data: T,
         ctx: EdgeContext = EdgeContext("ui")
     ): String
 
@@ -56,13 +61,13 @@ interface EdgeStore {
      * Updates an existing entity.
      * @param entity The entity descriptor.
      * @param _id The business identifier of the entity to update.
-     * @param payload The serialized payload of the updated entity.
+     * @param data The updated entity object.
      * @param ctx The mutation context.
      */
-    fun update(
-        entity: EdgeEntity<*>,
+    fun <T : Any> update(
+        entity: EdgeEntity<T>,
         _id: String,
-        payload: ByteArray,
+        data: T,
         ctx: EdgeContext = EdgeContext("ui")
     )
 
@@ -85,8 +90,8 @@ interface EdgeStore {
      * @return A list of matching entities.
      */
     fun <T : Any> query(
-        entity: EdgeEntity<*>,
-        filters: List<EdgeFilter>
+        entity: EdgeEntity<T>,
+        filters: List<EdgeFilter> = emptyList()
     ): List<T>
 
     /**

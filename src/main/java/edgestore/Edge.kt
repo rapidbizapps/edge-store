@@ -38,7 +38,6 @@ object Edge {
      */
     fun init(
         context: Context,
-        config: EdgeStoreConfig = EdgeStoreConfig(),
         defaultStoreName: String = "default"
     ) {
         synchronized(lock) {
@@ -46,7 +45,7 @@ object Edge {
                 throw IllegalStateException("Edge is already initialized")
             }
             this.defaultStoreName = defaultStoreName
-            this.initializer = EdgeStoreInitializer(context, config)
+            this.initializer = EdgeStoreInitializer(context)
         }
     }
 

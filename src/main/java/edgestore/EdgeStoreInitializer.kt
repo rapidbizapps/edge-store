@@ -17,7 +17,6 @@ import java.io.File
  */
 class EdgeStoreInitializer(
     context: Context,
-    private val config: EdgeStoreConfig = EdgeStoreConfig()
 ) {
 
     private val appContext = context.applicationContext
@@ -36,7 +35,7 @@ class EdgeStoreInitializer(
 
             val boxStore = buildBoxStore(storeName)
             boxStores[storeName] = boxStore
-            val edgeStore = EdgeStoreFactory.create(boxStore, config)
+            val edgeStore = EdgeStoreFactory.create(boxStore)
             stores[storeName] = edgeStore
             return edgeStore
         }
@@ -83,7 +82,7 @@ class EdgeStoreInitializer(
         }
 
         // Use the library's internal MyObjectBox - not the app's
-        val boxStore1 =  MyObjectBox.builder()
+        val boxStore1 = MyObjectBox.builder()
             .androidContext(appContext)
             .directory(dbDir)
             .build()

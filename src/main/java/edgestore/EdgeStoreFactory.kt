@@ -11,11 +11,10 @@ internal object EdgeStoreFactory {
     /**
      * Creates an EdgeStore instance using the provided BoxStore.
      * @param boxStore The BoxStore instance managed inside the SDK.
-     * @param config Configuration for EdgeStore (optional, defaults provided).
      * @return An EdgeStore instance.
      */
-    fun create(boxStore: BoxStore, config: EdgeStoreConfig = EdgeStoreConfig()): EdgeStore {
-        val edgeBox = EdgeBox(boxStore, config.serializer)
-        return EdgeStoreImpl(edgeBox, config)
+    fun create(boxStore: BoxStore): EdgeStore {
+        val edgeBox = EdgeBox(boxStore)
+        return EdgeStoreImpl(edgeBox)
     }
 }

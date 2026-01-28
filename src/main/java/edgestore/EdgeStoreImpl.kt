@@ -8,37 +8,35 @@ import edgestore.util.EdgeLogger
  * uses EdgeBox for persistence, records EdgeDirty entries, and logs all operations.
  */
 internal class EdgeStoreImpl(
-    private val edgeBox: EdgeBox,
-    private val config: EdgeStoreConfig
+    private val edgeBox: EdgeBox
 ) : EdgeStore {
 
-    override fun create(entity: EdgeEntity<*>, payload: ByteArray, ctx: EdgeContext): String {
-        val deserializedEntity = config.serializer.deserialize(payload, entity.clazz)
-        val _id = validateAndExtractId(deserializedEntity)
+    override fun <T : Any> create(entity: EdgeEntity<T>, data: T, ctx: EdgeContext): String {
+        val _id = validateAndExtractId(data)
         EdgeLogger.logCreate(entity, _id, ctx)
-        edgeBox.put(entity.name, _id, deserializedEntity)
+        edgeBox.put(data)
         recordDirty(entity.name, _id, "CREATE", ctx)
         return _id
     }
 
-    override fun update(entity: EdgeEntity<*>, _id: String, payload: ByteArray, ctx: EdgeContext) {
-        val deserializedEntity = config.serializer.deserialize(payload, entity.clazz)
-        validateId(deserializedEntity, _id)
+    override fun <T : Any> update(entity: EdgeEntity<T>, _id: String, data: T, ctx: EdgeContext) {
+        validateId(data, _id)
         EdgeLogger.logUpdate(entity, _id, ctx)
-        edgeBox.put(entity.name, _id, deserializedEntity)
+        edgeBox.put(data)
         recordDirty(entity.name, _id, "UPDATE", ctx)
     }
 
     override fun delete(entity: EdgeEntity<*>, _id: String, ctx: EdgeContext) {
         EdgeLogger.logDelete(entity, _id, ctx)
-        edgeBox.remove(entity.name, listOf(_id))
+        val filter = listOf(EdgeFilter("_id", Op.EQ, _id))
+        val entityToRemove = edgeBox.queryFirst(entity.clazz, filter)
+        entityToRemove?.let { edgeBox.remove(it) }
         recordDirty(entity.name, _id, "DELETE", ctx)
     }
 
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : Any> query(entity: EdgeEntity<*>, filters: List<EdgeFilter>): List<T> {
+    override fun <T : Any> query(entity: EdgeEntity<T>, filters: List<EdgeFilter>): List<T> {
         EdgeLogger.logQuery(entity, filters)
-        return edgeBox.query(entity.name, entity.clazz, filters) as List<T>
+        return edgeBox.query(entity.clazz, filters)
     }
 
     override fun close() {
@@ -79,6 +77,6 @@ internal class EdgeStoreImpl(
             this.reason = ctx.reason
             this.timestamp = System.currentTimeMillis()
         }
-        edgeBox.putDirty(dirty)
+        edgeBox.put(dirty)
     }
 }
