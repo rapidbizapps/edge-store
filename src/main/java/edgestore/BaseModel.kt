@@ -46,9 +46,12 @@ import io.objectbox.annotation.Index
 open class BaseModel {
     /**
      * ObjectBox primary key. Auto-assigned, do not set manually.
+     *
+     * Note: This is 'open' so subclasses in other modules can redeclare it with @Id
+     * annotation for the ObjectBox annotation processor to see it.
      */
     @Id
-    var id: Long = 0
+    open var id: Long = 0
 
     /**
      * Business identifier used for lookups and references.

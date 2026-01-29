@@ -10,19 +10,24 @@ import io.objectbox.BoxStore
  * database operations. This keeps ObjectBox/Room APIs completely hidden
  * from application code.
  *
- * Usage with app-provided BoxStore (recommended for direct entity CRUD):
+ * Usage with package name (recommended - no ObjectBox imports needed in app):
  * ```
  * // In Application.onCreate()
- * val boxStore = MyObjectBox.builder()
- *     .androidContext(this)
- *     .build()
- * Edge.init(boxStore)
+ * Edge.init(this, "com.example.myapp.models")
  *
  * // Later, DAOs automatically use Edge.session()
  * val tasks = Tasks.findAll()
  * ```
  *
- * Usage with context (for JSON serialization mode):
+ * Usage with app-provided BoxStore (alternative for direct control):
+ * ```
+ * val boxStore = MyObjectBox.builder()
+ *     .androidContext(this)
+ *     .build()
+ * Edge.init(boxStore)
+ * ```
+ *
+ * Usage with context only (for JSON serialization mode):
  * ```
  * Edge.init(context, EdgeStoreConfig())
  * ```
@@ -36,6 +41,30 @@ object Edge {
     private var defaultStoreName: String = "default"
 
     private val lock = Any()
+
+    /**
+     * Initialize Edge using reflection to discover MyObjectBox.
+     *
+     * This is the recommended approach - no ObjectBox imports needed in your app!
+     * Uses reflection to find and call MyObjectBox.builder().androidContext(context).build()
+     *
+     * @param context Android application context
+     * @param myObjectBoxPackage The package containing MyObjectBox (e.g., "com.example.myapp.models")
+     * @param config EdgeStore configuration (serializer, etc.)
+     */
+    fun init(
+        context: Context,
+        myObjectBoxPackage: String,
+        config: EdgeStoreConfig = EdgeStoreConfig()
+    ) {
+        synchronized(lock) {
+            if (initializer != null) {
+                throw IllegalStateException("Edge is already initialized")
+            }
+            this.defaultStoreName = "default"
+            this.initializer = EdgeStoreInitializer(context, myObjectBoxPackage, config)
+        }
+    }
 
     /**
      * Initialize Edge with an app-provided BoxStore.

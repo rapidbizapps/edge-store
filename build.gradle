@@ -52,10 +52,11 @@ repositories {
 }
 
 dependencies {
-    // Manually add objectbox-android-objectbrowser only for debug builds,
-    // and objectbox-android for release builds.
-    debugImplementation("io.objectbox:objectbox-android-objectbrowser:$objectboxVersion")
-    releaseImplementation("io.objectbox:objectbox-android:$objectboxVersion")
+    // Expose ObjectBox transitively so consuming apps don't need to declare these dependencies.
+    // objectbox-android-objectbrowser for debug builds (includes browser UI),
+    // objectbox-android for release builds (smaller, no browser).
+    debugApi("io.objectbox:objectbox-android-objectbrowser:$objectboxVersion")
+    releaseApi("io.objectbox:objectbox-android:$objectboxVersion")
     implementation 'org.jetbrains.kotlin:kotlin-reflect'
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3'
     // Gson for reflection-based serialization (no annotations needed on data classes)
